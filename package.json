@@ -1,0 +1,32 @@
+{
+  "name": "maodie",
+  "version": "1.2.9",
+  "description": "耄耋 —— DSH 桌面端常驻挂件：峰谷价与余额气泡、本次消耗、任务完成提醒、闹钟、可拖动缩放的猫、自定义外观与声音槽位、音频裁剪器",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "maodie",
+    "widget"
+  ],
+  "type": "module",
+  "main": "lib/index.js",
+  "files": [
+    "lib",
+    "assets",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test": "node test/mount.test.mjs && node test/contract.test.mjs && node test/dom.test.mjs",
+    "test:mount": "node test/mount.test.mjs",
+    "test:contract": "node test/contract.test.mjs",
+    "test:dom": "node test/dom.test.mjs"
+  },
+  "license": "MIT"
+}

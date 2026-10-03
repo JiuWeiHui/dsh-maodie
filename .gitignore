@@ -1,0 +1,21 @@
+# 生成物：由 .build 里的脚本产出，不入库（权威文件是 lib/index.js 与 assets/maodie.js）
+.build/index.js
+.build/frontend.js
+.build/mount.test.mjs
+.build/dom.test.mjs
+.build/contract.test.mjs
+.build/*.txt
+
+# 临时/备份
+*.bak
+*.orig
+*.tmp
+*~
+npm-debug.log*
+.DS_Store
+Thumbs.db
+node_modules/
+
+# 本机状态（插件运行时数据在 ~/.dsh/maodie/，本来就不在仓库里）
+state.json
+*.local.json
