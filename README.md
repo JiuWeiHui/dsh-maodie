@@ -558,6 +558,8 @@ DeepSeek 内置官方参考价，不用填；第三方（小米 MiMo 等）填�
 | **本地目录（开发用）** | `plugin_manager { action: "install_bundle", target: "link:<插件目录>" }` | HMR 打开时立刻生效；注入表变更仍需重启一次 |
 | **Git 直装** | `pnpm add github:JiuWeiHui/dsh-maodie` | 不想走 npm 时可用 |
 
+> **具体「放到哪里 / 怎么装 / 升级卸载 / 常见问题」见 [INSTALL.md](INSTALL.md)**（含新电脑上缺少 API key、设置、素材的说明）。
+
 ## 仓库与版本
 
 这个目录本身就是一个 Git 仓库（`main` 分支，标签 `v1.2.9`）。
