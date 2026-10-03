@@ -585,6 +585,7 @@ git push -u origin main --tags
   这个做法来自它；我们的代码是**独立编写**的（函数、结构、注释都是自己的），只借鉴了思路与价目表的组织方式。
   完整声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 - 价格数字（各档单价、峰谷时段、周末谷价生效日）来自 **DeepSeek 官方定价页**，不是抄任何一个插件。
+- `assets/` 下的形象图与音效**非原创**，来自 B 站若干视频，逐项出处见 [assets/SOURCES.md](assets/SOURCES.md)（版权归原作者，可自行替换）。
 
 ## 隐私
 
