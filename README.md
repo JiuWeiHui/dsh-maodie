@@ -49,14 +49,14 @@ DSH 桌面端（Electron 客户端）的常驻挂件：一只可以拖动、缩�
 
 ```
 plugin_manager { action: "install_bundle",
-                 target: "link:C:/Users/rennanchuan/Desktop/dsh-maodie" }
+                 target: "link:C:/path/to/dsh-maodie" }   # ← 换成你放插件的目录
 ```
 
 `target` 用 `link:<插件的绝对路径>`。装完 `~/.dsh/profiles/desktop/package.json` 会变成：
 
 ```json
 {
-  "dependencies": { "maodie": "link:C:/Users/rennanchuan/Desktop/dsh-maodie" },
+  "dependencies": { "maodie": "link:C:/path/to/dsh-maodie" },
   "dsh": { "profile": { "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "maodie"] } }
 }
 ```
@@ -576,6 +576,15 @@ git tag -a v1.2.10 -m "一句话"     # 版本号与 package.json / PLUGIN_VERSI
 git remote add origin https://github.com/<用户名>/dsh-maodie.git
 git push -u origin main --tags
 ```
+
+## 致谢与许可
+
+- 本项目以 **MIT** 许可发布（见 [LICENSE](LICENSE)）。
+- **计费口径借鉴了 `dsh-whale-widget`（MIT，Copyright (c) 2026 MeteorNOX）的实现思路**：
+  「每轮金额 = 每次模型调用的真实 usage × 该模型单价，按 (会话 id, 轮次) 分桶累加，而不是拿余额相减」——
+  这个做法来自它；我们的代码是**独立编写**的（函数、结构、注释都是自己的），只借鉴了思路与价目表的组织方式。
+  完整声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+- 价格数字（各档单价、峰谷时段、周末谷价生效日）来自 **DeepSeek 官方定价页**，不是抄任何一个插件。
 
 ## 隐私
 

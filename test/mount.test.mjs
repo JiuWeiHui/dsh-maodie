@@ -647,7 +647,7 @@ console.log('\n[13] 信任栅栏（可选开关）')
 console.log('\n[14] 导入的插件不污染鲸鱼')
 {
   const whalePaths = [
-    'C:\\Users\\rennanchuan\\.dsh\\profiles\\web\\node_modules\\dsh-whale-widget\\package.json',
+    path.join(os.homedir(), '.dsh', 'profiles', 'web', 'node_modules', 'dsh-whale-widget', 'package.json'),
   ]
   const ownFile = fs.readFileSync(path.join(__dirname, '..', 'lib', 'index.js'), 'utf8')
   check('插件源码不含 whale/鲸鱼 依赖', !/whale|dsh-whale/i.test(ownFile))

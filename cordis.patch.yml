@@ -7,7 +7,7 @@
 # 安装（0.2 桌面版）——不要再用旧 README 里那套「手改 package.json + 重启」，
 # 官方路径是 plugin_manager 服务：
 #   · 会话里（推荐）：plugin_manager { action: "install_bundle",
-#       target: "link:C:/Users/rennanchuan/.dsh/local-plugins/maodie" }
+#       target: "link:<插件目录>" }
 #     HMR 打开时 bundle 选择会即时生效，不需要重启 DSH。
 #   · 应用里：侧栏 → Plugins → Add plugin → 填插件绝对路径。
 #   · CLI：dsh plugin --profile desktop … 会被拒绝（desktop profile 由桌面端独占）。

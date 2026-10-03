@@ -10,19 +10,23 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import os from 'node:os'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const frontPath = path.join(__dirname, '..', 'assets', 'maodie.js')
 const code = fs.readFileSync(frontPath, 'utf8')
 
 let jsdom
-for (const candidate of [
+// jsdom 可能装在仓库里，也可能装在开发机上的临时目录（可用 MAODIE_JSDOM 覆盖）
+const jsdomCandidates = [
   path.join(__dirname, '..', 'node_modules', 'jsdom', 'lib', 'api.js'),
-  'C:/Users/rennanchuan/.dsh-jsdom-tmp/node_modules/jsdom/lib/api.js',
-]) {
+  path.join(os.homedir(), '.dsh-jsdom-tmp', 'node_modules', 'jsdom', 'lib', 'api.js'),
+]
+if (process.env.MAODIE_JSDOM) jsdomCandidates.unshift(process.env.MAODIE_JSDOM)
+for (const candidate of jsdomCandidates) {
   try {
-    jsdom = await import(candidate.startsWith('C:') ? 'file:///' + candidate.replace(/\\/g, '/') : candidate)
+    jsdom = await import(pathToFileURL(candidate).href)
     break
   } catch (err) {
     /* 试下一个 */
