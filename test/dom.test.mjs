@@ -57,7 +57,7 @@ const initPayload = {
   webBase: 'http://127.0.0.1:19487',
   apiBase: 'http://127.0.0.1:19487/maodie',
   request: { rejection: undefined },
-  version: '1.3.1',
+  version: '1.3.2',
   state: {
     appearance: { x: null, y: null, scale: 1, baseSize: 220, opacity: 1, shadow: true, pet: true },
     look: { flipAtLeft: true, clickAnim: 'shake', tripleShake: true, particles: true, particleCount: 26, bubbleStyle: 'balloon' },
@@ -142,7 +142,7 @@ const statusPayload = {
   session: initPayload.session,
   lastTurn: null,
   turnSeq: 0,
-  // 1.3.1：账户分开 + 本轮统计（金额按 token×单价估算；第三方标「仅供参考」）
+  // 1.3.2：账户分开 + 本轮统计（金额按 token×单价估算；第三方标「仅供参考」）
   modelCtx: { provider: 'xiaomi', model: 'mimo-v2.6-pro', at: Date.now(), source: 'assistant/message' },
   turn: {
     turn: 3,
@@ -182,6 +182,19 @@ const statusPayload = {
         lastTurn: { amount: 0.42, amountBasis: '按自定义单价估算（仅供参考）', tokens: 123456, model: 'mimo-v2.6-pro', ts: Date.now() },
       },
     ],
+    account: {
+      available: true,
+      signedIn: true,
+      status: 'credential-stored',
+      wallets: [{ currency: 'CNY', balance: 50 }],
+      bonusWallets: [{ currency: 'CNY', balance: 5 }],
+      usageUrl: 'https://platform.deepseek.com/usage',
+      topUpUrl: 'https://platform.deepseek.com/top_up',
+      updatedAt: Date.now(),
+      error: '',
+      source: 'DSH 登录账号（ctx.deepseekAccount）',
+      linkedToProvider: false,
+    },
     totals: { todayTokens: 223332, todayAmount: 1.79, currency: 'CNY', official: [{ id: 'deepseek-official', amount: 1.23 }], estimated: [{ id: 'xiaomi', amount: 0.56 }], note: '含 xiaomi ¥0.56（仅供参考）' },
   },
   native: initPayload.native,
@@ -436,8 +449,8 @@ console.log('\n[7] 右键 → 设置窗口')
   check(
     '设置窗口标题显示「前端 / Host」版本',
     !!titleNode &&
-      titleNode.textContent.indexOf('前端 1.3.1') !== -1 &&
-      titleNode.textContent.indexOf('Host 1.3.1') !== -1,
+      titleNode.textContent.indexOf('前端 1.3.2') !== -1 &&
+      titleNode.textContent.indexOf('Host 1.3.2') !== -1,
     titleNode && titleNode.textContent,
   )
   const tabs = mask ? mask.querySelectorAll('.md-set-tab') : []
@@ -1003,6 +1016,19 @@ console.log('\n[17] 「用量」页：账户分开 + 单价表')
   check('第三方金额标注「仅供参考」', text.indexOf('仅供参考') !== -1, text.slice(0, 240))
   check('显示总消耗', text.indexOf('总消耗（所有账户加总）') !== -1)
   check('有单价表编辑区', text.indexOf('单价表（元/百万 token）') !== -1)
+  check('用量页写明「余额是怎么来的」', text.indexOf('余额是怎么来的') !== -1 && text.indexOf('api.deepseek.com/user/balance') !== -1, text.slice(0, 200))
+  check('用量页写清自定义来源怎么填', text.indexOf('余额字段') !== -1 && text.indexOf('控制台') !== -1, text.slice(0, 400))
+  check(
+    'DSH 登录账号卡片：充值余额 + 赠送额度分开显示',
+    text.indexOf('DSH 登录账号') !== -1 && text.indexOf('充值余额') !== -1 && text.indexOf('赠送额度') !== -1 && text.indexOf('50.00') !== -1 && text.indexOf('5.00') !== -1,
+    text.slice(0, 400),
+  )
+  check('带官方用量页入口', text.indexOf('platform.deepseek.com/usage') !== -1)
+  check('可手动刷新账号/自定义/官方余额', text.indexOf('账号余额') !== -1 && text.indexOf('自定义来源') !== -1 && text.indexOf('官方余额') !== -1)
+  const urlInputs = pane ? pane.querySelectorAll('input[placeholder^="地址："]') : []
+  check('每个账户有「余额来源」地址填写框', urlInputs.length >= 2, 'count=' + urlInputs.length)
+  const testBtns = pane ? Array.from(pane.querySelectorAll('button')).filter((b) => b.textContent === '测试') : []
+  check('每个账户有「测试」按钮', testBtns.length >= 2, 'count=' + testBtns.length)
   check('用量页没有抛异常', pageErrors.length === 0, pageErrors.join(' | '))
 }
 

@@ -61,6 +61,13 @@ globalThis.fetch = async (url, options) => {
       }),
     }
   }
+  if (u.includes('example.test/notjson')) {
+    return { ok: true, status: 200, text: async () => '<html>nope</html>', json: async () => ({}) }
+  }
+  if (u.includes('example.test/balance')) {
+    const body = JSON.stringify({ data: { balance: 7.5, currency: 'USD', note: 'ok' } })
+    return { ok: true, status: 200, text: async () => body, json: async () => JSON.parse(body) }
+  }
   if (u.includes('/api/holiday/year/')) {
     return {
       ok: true,
@@ -146,6 +153,9 @@ function fakeReq(method, url, body) {
 // 假的 Context
 const registered = { routes: [], events: [], intervals: [], effects: [] }
 let fenceMode = 'allow'
+let accountService = false
+let accountSignedIn = false
+let defaultModelSelection = null
 
 const ctx = {
   get(name) {
@@ -162,6 +172,34 @@ const ctx = {
         async resolve(key) {
           if (key === 'DEEPSEEK_API_KEY') return { value: 'test-key' }
           return undefined
+        },
+      }
+    }
+    if (name === 'agentDefaultModel') {
+      if (!defaultModelSelection) return undefined
+      return {
+        currentSelection() {
+          return defaultModelSelection
+        },
+      }
+    }
+    if (name === 'deepseekAccount') {
+      if (!accountService) return undefined
+      return {
+        async getState() {
+          return {
+            status: accountSignedIn ? 'credential-stored' : 'signed-out',
+            links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' },
+            attempt: null,
+          }
+        },
+        async getBalance() {
+          if (!accountSignedIn) return null
+          return {
+            status: 'ready',
+            value: [{ currency: 'CNY', balance: '50.00' }],
+            bonusWallets: [{ currency: 'CNY', balance: '5.00' }],
+          }
         },
       }
     }
@@ -244,7 +282,7 @@ console.log('[0] 包文件完整性')
   }
   check('package.json 是合法 JSON', pkg !== null)
   check('name 是 maodie', pkg && pkg.name === 'maodie', String(pkg && pkg.name))
-  check('version 是 1.3.1', pkg && pkg.version === '1.3.1', String(pkg && pkg.version))
+  check('version 是 1.3.2', pkg && pkg.version === '1.3.2', String(pkg && pkg.version))
   check('type 是 module', pkg && pkg.type === 'module')
   check('main 指向 lib/index.js', pkg && pkg.main === 'lib/index.js', String(pkg && pkg.main))
   check('声明了 dsh.bundle.patch', pkg && pkg.dsh && pkg.dsh.bundle && pkg.dsh.bundle.patch === './cordis.patch.yml')
@@ -306,7 +344,7 @@ console.log('\n[2] init.json')
   const j = res.json()
   check('HTTP 200', res.statusCode === 200, 'got ' + res.statusCode)
   check('ok=true', j && j.ok === true)
-  check('version=1.3.1', j && j.version === '1.3.1', String(j && j.version))
+  check('version=1.3.2', j && j.version === '1.3.2', String(j && j.version))
   check('带 state', j && j.state && typeof j.state === 'object')
   check('state 有 4 个默认声音槽位', j && j.state && j.state.audio && j.state.audio.slots.length === 4, String(j && j.state && j.state.audio && j.state.audio.slots.length))
   // 用户指定的默认值
@@ -417,7 +455,7 @@ console.log('\n[8] 前端脚本路由 + index 注入行')
   const rows = ctx.webServer.collectIndexInjections()
   const srcRow = rows.find((r) => r && r.kind === 'script-src')
   check('注入表里有 script-src 行', !!srcRow, JSON.stringify(rows))
-  check('注入行指向 /maodie/maodie.js 且带版本参数', !!srcRow && /^\/maodie\/maodie\.js\?v=1\.3\.1$/.test(srcRow.src), srcRow && srcRow.src)
+  check('注入行指向 /maodie/maodie.js 且带版本参数', !!srcRow && /^\/maodie\/maodie\.js\?v=1\.3\.2$/.test(srcRow.src), srcRow && srcRow.src)
   check('注入行放在 head', !!srcRow && srcRow.placement === 'head')
   check('注入表里有 preload 提示行', rows.some((r) => r && r.kind === 'script-preload' && r.src === srcRow.src))
   // 幂等：再收集一次不重复
@@ -425,8 +463,8 @@ console.log('\n[8] 前端脚本路由 + index 注入行')
   check('重复收集不会重复 push', rows2.filter((r) => r && r.kind === 'script-src').length === 1)
   // 浏览器直连路径：renderIndex 把行渲染成真正的 <script>
   const html = ctx.webServer.renderIndex('<html><head></head><body><div id="root"></div></body></html>')
-  check('renderIndex 渲染出 script 标签', html.includes('<script src="/maodie/maodie.js?v=1.3.1">'))
-  check('renderIndex 渲染出 preload', html.includes('rel="preload" as="script" href="/maodie/maodie.js?v=1.3.1"'))
+  check('renderIndex 渲染出 script 标签', html.includes('<script src="/maodie/maodie.js?v=1.3.2">'))
+  check('renderIndex 渲染出 preload', html.includes('rel="preload" as="script" href="/maodie/maodie.js?v=1.3.2"'))
 
   // 自检页：刻意不套信任栅栏，栅栏拒绝时也要能打开
   fenceMode = 'deny'
@@ -445,7 +483,7 @@ console.log('\n[8b] 前端启动回执 /maodie/hello')
   check('diag 报告 renderIndex 也渲染成功', before && before.indexInjection && before.indexInjection.renderedIntoIndexHtml === true)
 
   const post = await callRoute('/maodie/hello', 'POST', {
-    version: '1.3.1',
+    version: '1.3.2',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -546,12 +584,12 @@ console.log('\n[12] 闹钟到时（自定义文字走 { } 占位符）')
 
   // 手动跑一次闹钟巡检（真实 Host 里是 20 秒一次；这里用诊断钩子精确触发）
   const sweep = await callRoute('/maodie/diag?runAlarmSweep=1')
-  check('诊断钩子能手动跑闹钟巡检', sweep.statusCode === 200 && sweep.json().plugin === '1.3.1', String(sweep.statusCode))
+  check('诊断钩子能手动跑闹钟巡检', sweep.statusCode === 200 && sweep.json().plugin === '1.3.2', String(sweep.statusCode))
   check('巡检结果记录在 alarmChecks 里', !!sweep.json().alarmChecks && sweep.json().alarmChecks.hhmm.length === 5)
   const frame = String(sseRes.body)
   check('推送了 alarm 事件', frame.indexOf('"type":"alarm"') !== -1)
   {
-    // 1.3.1：通知文案里能用 {turnCost}/{turnTokens}，并且挂载时一次性把「本次消耗」补进已有文案
+    // 1.3.2：通知文案里能用 {turnCost}/{turnTokens}，并且挂载时一次性把「本次消耗」补进已有文案
     const st = (await callRoute('/maodie/state.json')).json()
     const tcfg = st.state && st.state.notify && st.state.notify.turnEnd
     check(
@@ -822,7 +860,7 @@ console.log('\n[17] 自定义外观图（上传 / 列表 / 删除）')
 console.log('\n[18] 前端心跳 / 报告 / diag')
 {
   const h = (await callRoute('/maodie/hello', 'POST', {
-    version: '1.3.1',
+    version: '1.3.2',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -831,7 +869,7 @@ console.log('\n[18] 前端心跳 / 报告 / diag')
   })).json()
   check('hello 回执 ok', h && h.ok === true)
   const rep = (await callRoute('/maodie/report.json', 'POST', {
-    version: '1.3.1',
+    version: '1.3.2',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -856,7 +894,7 @@ console.log('\n[18] 前端心跳 / 报告 / diag')
   })
 
   const diag = (await callRoute('/maodie/diag')).json()
-  check('diag 报插件版本', diag && diag.plugin === '1.3.1', String(diag && diag.plugin))
+  check('diag 报插件版本', diag && diag.plugin === '1.3.2', String(diag && diag.plugin))
   check('diag 报注入行', diag && diag.indexInjection && diag.indexInjection.rowsInTable >= 1)
   check('diag 报前端已启动', diag && diag.frontend && diag.frontend.booted === true)
   check(
@@ -1025,6 +1063,100 @@ console.log('\n[22] 账户分账 + 每轮金额（token × 单价，按会话分
   check('总 token = 各账户之和', provs.totals.todayTokens >= 3100000, String(provs.totals.todayTokens))
   const ds = provs.providers.find((p) => p.id === 'deepseek-official')
   check('官方供应商的今日口径字段存在', !!ds && 'officialCost' in ds.today, JSON.stringify(ds && ds.today))
+}
+
+console.log('\n[24] DSH 登录账号余额（DeepSeek Account；官方 API key 那条不受影响）')
+{
+  // 1) 没有账号服务时：如实标注，不影响 API key 那条
+  let provs = (await callRoute('/maodie/providers.json')).json()
+  check('没有账号服务时如实标注', !!provs.account && provs.account.available === false && provs.account.signedIn === false, JSON.stringify(provs.account))
+  const official0 = provs.providers.find((p) => p.id === 'deepseek-official')
+  check('API key 那条余额照常工作（不受账号服务影响）', !!official0, JSON.stringify(provs.providers.map((p) => p.id)))
+
+  // 2) 有账号服务但未登录
+  accountService = true
+  accountSignedIn = false
+  await callRoute('/maodie/diag?refreshAccount=1')
+  provs = (await callRoute('/maodie/providers.json')).json()
+  check('未登录时标记 signedIn=false', !!provs.account && provs.account.available === true && provs.account.signedIn === false, JSON.stringify(provs.account))
+  check('未登录时不给钱包数字', Array.isArray(provs.account.wallets) && provs.account.wallets.length === 0)
+  check('未登录也带官方用量页入口', typeof provs.account.usageUrl === 'string', provs.account.usageUrl)
+
+  // 3) 登录后：充值钱包 + 赠送钱包分开给
+  accountSignedIn = true
+  await callRoute('/maodie/diag?refreshAccount=1')
+  provs = (await callRoute('/maodie/providers.json')).json()
+  check('登录后 signedIn=true', !!provs.account && provs.account.signedIn === true, JSON.stringify(provs.account))
+  check('充值钱包拿到数字', !!provs.account.wallets[0] && provs.account.wallets[0].balance === 50, JSON.stringify(provs.account.wallets))
+  check('赠送钱包单独给', !!provs.account.bonusWallets[0] && provs.account.bonusWallets[0].balance === 5, JSON.stringify(provs.account.bonusWallets))
+  check('带官方用量页地址', provs.account.usageUrl.indexOf('platform.deepseek.com') !== -1, provs.account.usageUrl)
+  check('来源标注清楚', String(provs.account.source).indexOf('登录账号') !== -1, provs.account.source)
+  // 没有任何 provider id 带 account 时，不应强行改别的账户
+  check('不会把账号余额冒充别的账户', provs.account.linkedToProvider === false, String(provs.account.linkedToProvider))
+}
+
+console.log('\n[25] 自定义余额来源（含试接口）+ 切换模型即时跟随')
+{
+  // 1) 试接口：只读地请求一次，回状态码 + 原始片段 + 挑出的数字与候选路径（不改配置）
+  const test = (
+    await callRoute('/maodie/balance-test.json', 'POST', {
+      url: 'https://example.test/balance',
+      fieldPath: 'data.balance',
+      currencyPath: 'data.currency',
+    })
+  ).json()
+  check('试接口拿到 HTTP 状态', test.ok === true && test.status === 200, JSON.stringify(test).slice(0, 160))
+  check(
+    '试接口认出余额与字段路径',
+    !!test.picked && test.picked.value === 7.5 && test.picked.path === 'data.balance',
+    JSON.stringify(test.picked),
+  )
+  check('试接口给出候选数字（方便从返回里挑）', Array.isArray(test.candidates) && test.candidates.length > 0, JSON.stringify(test.candidates))
+  check('试接口回币种', String(test.currency) === 'USD', String(test.currency))
+  check('试接口带原始返回片段', typeof test.bodySnippet === 'string' && test.bodySnippet.length > 0)
+
+  // 2) 配上自定义来源 → 刷新 → 该账户余额变成自定义接口的数
+  await callRoute('/maodie/state.json', 'POST', {
+    state: {
+      balances: {
+        custom: {
+          xiaomi: { url: 'https://example.test/balance', fieldPath: 'data.balance', currencyPath: 'data.currency' },
+        },
+      },
+    },
+  })
+  await callRoute('/maodie/diag?refreshBalances=1')
+  const provs = (await callRoute('/maodie/providers.json')).json()
+  const xm = provs.providers.find((p) => p.id === 'xiaomi')
+  check('自定义来源生效：余额被填上', !!xm && xm.balance.known === true && xm.balance.total === 7.5, JSON.stringify(xm && xm.balance))
+  check('自定义来源：币种按字段解析', !!xm && xm.balance.currency === 'USD', JSON.stringify(xm && xm.balance))
+  check('自定义来源：来源标注到域名', !!xm && String(xm.balance.source).indexOf('example.test') !== -1, xm && xm.balance.source)
+
+  // 3) 字段路径写错 → 自动挑（并在返回里说明是自动挑的），不是静默瞎填
+  const test2 = (
+    await callRoute('/maodie/balance-test.json', 'POST', {
+      url: 'https://example.test/balance',
+      fieldPath: 'nope.deep',
+    })
+  ).json()
+  check('字段路径写错时自动挑，并标明 auto', !!test2.picked && test2.picked.auto === true && test2.picked.value === 7.5, JSON.stringify(test2.picked))
+
+  // 3b) 真解析不了（不是 JSON）→ 如实报错，不瞎填数字
+  await callRoute('/maodie/state.json', 'POST', {
+    state: { balances: { custom: { 'no-json': { url: 'https://example.test/notjson', fieldPath: 'data.balance' } } } },
+  })
+  await callRoute('/maodie/diag?refreshBalances=1')
+  const provs2 = (await callRoute('/maodie/providers.json')).json()
+  const ns = provs2.providers.find((p) => p.id === 'no-json')
+  check('返回不是 JSON 时如实报错（不瞎填数字）', !!ns && ns.balance.known === false && String(ns.balance.error).length > 0, JSON.stringify(ns && ns.balance))
+  check('错误里说清原因', !!ns && String(ns.balance.error).indexOf('JSON') !== -1, ns && ns.balance.error)
+
+  // 4) 切换模型即时跟随：读 ctx.agentDefaultModel.currentSelection()
+  defaultModelSelection = { provider: 'deepseek-official', model: 'deepseek-v4-pro' }
+  const st = (await callRoute('/maodie/status.json')).json()
+  check('状态里跟随默认模型选择（不必等下一轮对话）', !!st.modelCtx && st.modelCtx.provider === 'deepseek-official' && st.modelCtx.model === 'deepseek-v4-pro', JSON.stringify(st.modelCtx))
+  check('并标明来源是默认选择', !!st.modelCtx && st.modelCtx.source === 'default-selection', String(st.modelCtx && st.modelCtx.source))
+  defaultModelSelection = null
 }
 
 // ---------------------------------------------------------------- 收尾
