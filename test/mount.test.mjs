@@ -244,7 +244,7 @@ console.log('[0] 包文件完整性')
   }
   check('package.json 是合法 JSON', pkg !== null)
   check('name 是 maodie', pkg && pkg.name === 'maodie', String(pkg && pkg.name))
-  check('version 是 1.2.9', pkg && pkg.version === '1.2.9', String(pkg && pkg.version))
+  check('version 是 1.3.0', pkg && pkg.version === '1.3.0', String(pkg && pkg.version))
   check('type 是 module', pkg && pkg.type === 'module')
   check('main 指向 lib/index.js', pkg && pkg.main === 'lib/index.js', String(pkg && pkg.main))
   check('声明了 dsh.bundle.patch', pkg && pkg.dsh && pkg.dsh.bundle && pkg.dsh.bundle.patch === './cordis.patch.yml')
@@ -306,7 +306,7 @@ console.log('\n[2] init.json')
   const j = res.json()
   check('HTTP 200', res.statusCode === 200, 'got ' + res.statusCode)
   check('ok=true', j && j.ok === true)
-  check('version=1.2.9', j && j.version === '1.2.9', String(j && j.version))
+  check('version=1.3.0', j && j.version === '1.3.0', String(j && j.version))
   check('带 state', j && j.state && typeof j.state === 'object')
   check('state 有 4 个默认声音槽位', j && j.state && j.state.audio && j.state.audio.slots.length === 4, String(j && j.state && j.state.audio && j.state.audio.slots.length))
   // 用户指定的默认值
@@ -417,7 +417,7 @@ console.log('\n[8] 前端脚本路由 + index 注入行')
   const rows = ctx.webServer.collectIndexInjections()
   const srcRow = rows.find((r) => r && r.kind === 'script-src')
   check('注入表里有 script-src 行', !!srcRow, JSON.stringify(rows))
-  check('注入行指向 /maodie/maodie.js 且带版本参数', !!srcRow && /^\/maodie\/maodie\.js\?v=1\.2\.9$/.test(srcRow.src), srcRow && srcRow.src)
+  check('注入行指向 /maodie/maodie.js 且带版本参数', !!srcRow && /^\/maodie\/maodie\.js\?v=1\.3\.0$/.test(srcRow.src), srcRow && srcRow.src)
   check('注入行放在 head', !!srcRow && srcRow.placement === 'head')
   check('注入表里有 preload 提示行', rows.some((r) => r && r.kind === 'script-preload' && r.src === srcRow.src))
   // 幂等：再收集一次不重复
@@ -425,8 +425,8 @@ console.log('\n[8] 前端脚本路由 + index 注入行')
   check('重复收集不会重复 push', rows2.filter((r) => r && r.kind === 'script-src').length === 1)
   // 浏览器直连路径：renderIndex 把行渲染成真正的 <script>
   const html = ctx.webServer.renderIndex('<html><head></head><body><div id="root"></div></body></html>')
-  check('renderIndex 渲染出 script 标签', html.includes('<script src="/maodie/maodie.js?v=1.2.9">'))
-  check('renderIndex 渲染出 preload', html.includes('rel="preload" as="script" href="/maodie/maodie.js?v=1.2.9"'))
+  check('renderIndex 渲染出 script 标签', html.includes('<script src="/maodie/maodie.js?v=1.3.0">'))
+  check('renderIndex 渲染出 preload', html.includes('rel="preload" as="script" href="/maodie/maodie.js?v=1.3.0"'))
 
   // 自检页：刻意不套信任栅栏，栅栏拒绝时也要能打开
   fenceMode = 'deny'
@@ -445,7 +445,7 @@ console.log('\n[8b] 前端启动回执 /maodie/hello')
   check('diag 报告 renderIndex 也渲染成功', before && before.indexInjection && before.indexInjection.renderedIntoIndexHtml === true)
 
   const post = await callRoute('/maodie/hello', 'POST', {
-    version: '1.2.9',
+    version: '1.3.0',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -546,7 +546,7 @@ console.log('\n[12] 闹钟到时（自定义文字走 { } 占位符）')
 
   // 手动跑一次闹钟巡检（真实 Host 里是 20 秒一次；这里用诊断钩子精确触发）
   const sweep = await callRoute('/maodie/diag?runAlarmSweep=1')
-  check('诊断钩子能手动跑闹钟巡检', sweep.statusCode === 200 && sweep.json().plugin === '1.2.9', String(sweep.statusCode))
+  check('诊断钩子能手动跑闹钟巡检', sweep.statusCode === 200 && sweep.json().plugin === '1.3.0', String(sweep.statusCode))
   check('巡检结果记录在 alarmChecks 里', !!sweep.json().alarmChecks && sweep.json().alarmChecks.hhmm.length === 5)
   const frame = String(sseRes.body)
   check('推送了 alarm 事件', frame.indexOf('"type":"alarm"') !== -1)
@@ -811,7 +811,7 @@ console.log('\n[17] 自定义外观图（上传 / 列表 / 删除）')
 console.log('\n[18] 前端心跳 / 报告 / diag')
 {
   const h = (await callRoute('/maodie/hello', 'POST', {
-    version: '1.2.9',
+    version: '1.3.0',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -820,7 +820,7 @@ console.log('\n[18] 前端心跳 / 报告 / diag')
   })).json()
   check('hello 回执 ok', h && h.ok === true)
   const rep = (await callRoute('/maodie/report.json', 'POST', {
-    version: '1.2.9',
+    version: '1.3.0',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -845,7 +845,7 @@ console.log('\n[18] 前端心跳 / 报告 / diag')
   })
 
   const diag = (await callRoute('/maodie/diag')).json()
-  check('diag 报插件版本', diag && diag.plugin === '1.2.9', String(diag && diag.plugin))
+  check('diag 报插件版本', diag && diag.plugin === '1.3.0', String(diag && diag.plugin))
   check('diag 报注入行', diag && diag.indexInjection && diag.indexInjection.rowsInTable >= 1)
   check('diag 报前端已启动', diag && diag.frontend && diag.frontend.booted === true)
   check(
@@ -941,6 +941,79 @@ console.log('\n[19] 声音配置自愈（矛盾配置可重复修，但不会违
   const def = JSON.parse(fs.readFileSync(stateFile, 'utf8'))
   const done4 = def.audio.slots.filter((s) => s.trigger === 'turn.end')[0]
   check('没有 notify 配置时按「要声音」处理并自愈', !!done4 && done4.enabled !== false, JSON.stringify(done4))
+}
+
+console.log('\n[22] 账户分账 + 每轮金额（token × 单价，按会话分桶，免疫并发）')
+{
+  const listener = registered.events.find((e) => e.name === 'session/event').listener
+  const A = { id: 'sess-A' }
+  const B = { id: 'sess-B' }
+  const msg = (provider, model, usage, turn) => ({
+    type: 'assistant/message',
+    data: { turn, step: 1, usage, message: { source: { provider, model } } },
+  })
+
+  // 会话 A 的第 5 轮：DeepSeek flash，输入 1M（未命中）+ 输出 100k
+  listener(A, msg('deepseek-official', 'deepseek-flash', { inputTokens: 1000000, outputTokens: 100000, cacheReadTokens: 0, reasoningTokens: 0 }, 5))
+  // 并发：会话 B 同时在跑自己的第 9 轮（小米）
+  listener(B, msg('xiaomi', 'mimo-v2.6-pro', { inputTokens: 2000000, outputTokens: 0, cacheReadTokens: 0, reasoningTokens: 0 }, 9))
+  // A 结束这一轮
+  listener(A, { type: 'turn/end', data: { turn: 5, reason: { kind: 'completed' } } })
+
+  const usage = (await callRoute('/maodie/turn.json')).json()
+  check('usage.json 报出本轮', !!usage.turn, 'DEBUG ' + JSON.stringify(usage).slice(0, 400))
+  check(
+    '本轮 token 只算自己那个会话（并发不串账）',
+    !!usage.turn && usage.turn.tokens === 1100000,
+    String(usage.turn && usage.turn.tokens),
+  )
+  check(
+    '本轮金额 = token × 官方单价（谷价 1.4 / 峰价 2.8）',
+    !!usage.turn && [1.4, 2.8].indexOf(usage.turn.amount) !== -1,
+    String(usage.turn && usage.turn.amount),
+  )
+  check(
+    '本轮标注了金额口径',
+    !!usage.turn && usage.turn.amountBasis.indexOf('估算') !== -1,
+    usage.turn && usage.turn.amountBasis,
+  )
+  check(
+    '本轮记了供应商与模型',
+    !!usage.turn && usage.turn.provider === 'deepseek-official' && usage.turn.model === 'deepseek-flash',
+    JSON.stringify(usage.turn),
+  )
+  // current = 最近一次模型活动的供应商（这里 B 的小米消息在最后，所以是 xiaomi）
+  check(
+    'usage.json 带当前供应商/模型（最近一次活动）',
+    !!usage.current && usage.current.provider === 'xiaomi' && usage.current.model === 'mimo-v2.6-pro',
+    JSON.stringify(usage.current),
+  )
+  check('usage.json 带价目来源', !!usage.pricing && /deepseek/.test(String(usage.pricing.source)), JSON.stringify(usage.pricing && usage.pricing.source))
+
+  // B 结束：第三方（没填单价）金额必须标注「仅供参考」
+  listener(B, { type: 'turn/end', data: { turn: 9, reason: { kind: 'completed' } } })
+  const usage2 = (await callRoute('/maodie/turn.json')).json()
+  check('第三方本轮金额带「仅供参考」', !!usage2.turn && /仅供参考/.test(usage2.turn.amountBasis), usage2.turn && usage2.turn.amountBasis)
+  check('第三方本轮记在自己那一栏（provider=xiaomi）', !!usage2.turn && usage2.turn.provider === 'xiaomi', JSON.stringify(usage2.turn))
+
+  const provs = (await callRoute('/maodie/providers.json')).json()
+  const ids = provs.providers.map((p) => p.id)
+  check(
+    '账户隔开：DeepSeek 与小米各一栏',
+    ids.indexOf('deepseek-official') !== -1 && ids.indexOf('xiaomi') !== -1,
+    JSON.stringify(ids),
+  )
+  const xm = provs.providers.find((p) => p.id === 'xiaomi')
+  check(
+    '小米余额是「未知」（没有官方来源）',
+    !!xm && xm.balance.known === false && xm.balance.total === null,
+    JSON.stringify(xm && xm.balance),
+  )
+  check('小米今天的 token 记在自己账上', !!xm && xm.today.tokens >= 2000000, JSON.stringify(xm && xm.today))
+  check('总消耗把估算部分标成「仅供参考」', /仅供参考/.test(provs.totals.note), provs.totals.note)
+  check('总 token = 各账户之和', provs.totals.todayTokens >= 3100000, String(provs.totals.todayTokens))
+  const ds = provs.providers.find((p) => p.id === 'deepseek-official')
+  check('官方供应商的今日口径字段存在', !!ds && 'officialCost' in ds.today, JSON.stringify(ds && ds.today))
 }
 
 // ---------------------------------------------------------------- 收尾

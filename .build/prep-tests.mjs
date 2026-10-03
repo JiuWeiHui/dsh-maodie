@@ -7,8 +7,8 @@ const B = path.join(ROOT, '.build')
 
 const mount = fs.readFileSync(path.join(ROOT, 'test', 'mount.test.mjs'), 'utf8')
   .replace(`path.join(__dirname, '..', 'lib', 'index.js')`, `path.join(__dirname, 'index.js')`)
-  .split('1\\.1\\.0').join('1\\.2\\.9')
-  .split('1.1.0').join('1.2.9')
+  .split('1\\.1\\.0').join('1\\.3\\.0')
+  .split('1.1.0').join('1.3.0')
 fs.writeFileSync(path.join(B, 'mount.test.mjs'), mount)
 
 const dom = fs.readFileSync(path.join(ROOT, 'test', 'dom.test.mjs'), 'utf8')

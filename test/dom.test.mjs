@@ -57,7 +57,7 @@ const initPayload = {
   webBase: 'http://127.0.0.1:19487',
   apiBase: 'http://127.0.0.1:19487/maodie',
   request: { rejection: undefined },
-  version: '1.2.9',
+  version: '1.3.0',
   state: {
     appearance: { x: null, y: null, scale: 1, baseSize: 220, opacity: 1, shadow: true, pet: true },
     look: { flipAtLeft: true, clickAnim: 'shake', tripleShake: true, particles: true, particleCount: 26, bubbleStyle: 'balloon' },
@@ -142,6 +142,48 @@ const statusPayload = {
   session: initPayload.session,
   lastTurn: null,
   turnSeq: 0,
+  // 1.3.0：账户分开 + 本轮统计（金额按 token×单价估算；第三方标「仅供参考」）
+  modelCtx: { provider: 'xiaomi', model: 'mimo-v2.6-pro', at: Date.now(), source: 'assistant/message' },
+  turn: {
+    turn: 3,
+    seq: 9,
+    provider: 'xiaomi',
+    model: 'mimo-v2.6-pro',
+    amount: 0.42,
+    amountBasis: '按自定义单价估算（仅供参考）',
+    tokens: 123456,
+    input: 100000,
+    cache: 20000,
+    output: 3456,
+    ts: Date.now(),
+  },
+  providers: {
+    providers: [
+      {
+        id: 'deepseek-official',
+        name: 'DeepSeek',
+        displayName: 'DeepSeek',
+        available: true,
+        configError: '',
+        balance: { known: true, total: 12.34, currency: 'CNY', source: '官方', error: '', updatedAt: Date.now(), officialTodayCost: 1.23 },
+        today: { tokens: 999, estimateCost: 1.23, estimateBasis: '按官方参考价估算（官方价目）', officialCost: 1.23 },
+        models: {},
+        lastTurn: null,
+      },
+      {
+        id: 'xiaomi',
+        name: '小米',
+        displayName: '小米 MiMo',
+        available: true,
+        configError: '',
+        balance: { known: false, total: null, currency: 'CNY', source: '', error: '未配置官方余额来源', updatedAt: 0, officialTodayCost: null },
+        today: { tokens: 222333, estimateCost: 0.56, estimateBasis: '按自定义单价估算（仅供参考）', officialCost: null },
+        models: {},
+        lastTurn: { amount: 0.42, amountBasis: '按自定义单价估算（仅供参考）', tokens: 123456, model: 'mimo-v2.6-pro', ts: Date.now() },
+      },
+    ],
+    totals: { todayTokens: 223332, todayAmount: 1.79, currency: 'CNY', official: [{ id: 'deepseek-official', amount: 1.23 }], estimated: [{ id: 'xiaomi', amount: 0.56 }], note: '含 xiaomi ¥0.56（仅供参考）' },
+  },
   native: initPayload.native,
   serverTime: Date.now(),
 }
@@ -321,7 +363,11 @@ console.log('\n[3] 点击 → 哈气')
   check('单击后冒出气泡', !!bubble)
   check('气泡里有峰谷标签', !!bubble && !!bubble.querySelector('.md-peak-badge'))
   check('气泡里有余额行', !!bubble && bubble.textContent.indexOf('余额') !== -1)
-  check('气泡里有今日已用', !!bubble && bubble.textContent.indexOf('今日已用') !== -1)
+  check('气泡里有今日（本账户）', !!bubble && bubble.textContent.indexOf('今日（本账户）') !== -1, bubble && bubble.textContent.slice(0, 120))
+  check('气泡里显示本轮金额', !!bubble && bubble.textContent.indexOf('本轮') !== -1 && bubble.textContent.indexOf('¥ 0.42') !== -1, bubble && bubble.textContent.slice(0, 160))
+  check('气泡里标注本轮口径', !!bubble && bubble.textContent.indexOf('仅供参考') !== -1, bubble && bubble.textContent.slice(0, 200))
+  check('气泡里显示总消耗', !!bubble && bubble.textContent.indexOf('总消耗（全部）') !== -1)
+  check('没有官方余额来源时显示「余额未知」', !!bubble && bubble.textContent.indexOf('余额未知') !== -1, bubble && bubble.textContent.slice(0, 200))
   check('气泡显示倒计时', !!bubble && bubble.textContent.indexOf('距') !== -1)
   check('单击触发了声音播放', playedAudio.length > 0, playedAudio.join(','))
 }
@@ -382,14 +428,14 @@ console.log('\n[7] 右键 → 设置窗口')
   check(
     '设置窗口标题显示「前端 / Host」版本',
     !!titleNode &&
-      titleNode.textContent.indexOf('前端 1.2.9') !== -1 &&
-      titleNode.textContent.indexOf('Host 1.2.9') !== -1,
+      titleNode.textContent.indexOf('前端 1.3.0') !== -1 &&
+      titleNode.textContent.indexOf('Host 1.3.0') !== -1,
     titleNode && titleNode.textContent,
   )
   const tabs = mask ? mask.querySelectorAll('.md-set-tab') : []
-  check('有 5 个标签页', tabs.length === 5, 'count=' + tabs.length)
+  check('有 6 个标签页', tabs.length === 6, 'count=' + tabs.length)
   const names = Array.prototype.map.call(tabs, (t) => t.textContent).join('/')
-  check('标签页是 外观/声音/提醒/峰谷/关于', names === '外观/声音/提醒/峰谷/关于', names)
+  check('标签页是 外观/声音/提醒/峰谷/用量/关于', names === '外观/声音/提醒/峰谷/用量/关于', names)
 
   // 切到声音页，检查槽位渲染
   for (const t of tabs) if (t.textContent === '声音') t.dispatchEvent(new win.MouseEvent('click', { bubbles: true }))
@@ -780,8 +826,21 @@ console.log('\n[14] 闹钟兜底：Host 不吭声时前端会补一枪（不会�
   sseInstances[0].onmessage({ data: JSON.stringify({ type: 'state', boot: 'BOOT-A', seq: 902, data: { at: Date.now() } }) })
   await sleep(1200)
   check('前端同步到了兜底闹钟的配置', true)
-  await sleep(3300) // 兜底巡检是 3 秒一轮
-  const pokes = pokesOf()
+  // 兜底巡检是 3 秒一轮，而「到点那一分钟」是挂钟决定的：万一测试刚好跨过分钟边界，
+  // 闹钟时间就对不上当前分钟了。所以这里重试几次（每次都把时间重设成当前分钟），
+  // 让这条断言只考「补枪行为」，不考「运气」。
+  let pokes = pokesOf()
+  for (let attempt = 0; attempt < 3 && pokes.length === before; attempt++) {
+    const d2 = new Date()
+    const p2b = (n) => String(n).padStart(2, '0')
+    const hhmm2 = p2b(d2.getHours()) + ':' + p2b(d2.getMinutes())
+    initPayload.state.alarms = [{ id: 'a-fallback', name: '兜底', time: hhmm2, mode: 'daily', text: '该起了', enabled: true }]
+    sseInstances[0].onmessage({
+      data: JSON.stringify({ type: 'state', boot: 'BOOT-A', seq: 905 + attempt, data: { at: Date.now() } }),
+    })
+    await sleep(3700)
+    pokes = pokesOf()
+  }
   check('前端在到点那一分钟补了一枪 /alarm-fire.json', pokes.length > before, 'before=' + before + ' after=' + pokes.length)
   check('补枪只发一次（不会刷屏）', pokes.length - before === 1, 'pokes=' + (pokes.length - before))
   check('补枪用的是 POST', pokes.length > 0 && pokes[pokes.length - 1].method === 'POST', pokes.length ? pokes[pokes.length - 1].method : 'none')
@@ -911,6 +970,32 @@ console.log('\n[16] 设置窗口固定居中、不可拖动（用户要求：别
   }
   check('设置窗口交互没有抛异常', pageErrors.length === 0, pageErrors.join(' | '))
   await closeSettings()
+}
+
+console.log('\n[17] 「用量」页：账户分开 + 单价表')
+{
+  const tabs = win.document.querySelectorAll('.md-set-tab')
+  const tabList = Array.from(tabs)
+  let idx = -1
+  tabList.forEach((t, i) => {
+    if (t.textContent === '用量') idx = i
+  })
+  check('存在「用量」标签页', idx !== -1)
+  const tabBtn = idx >= 0 ? tabList[idx] : null
+  if (tabBtn) tabBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }))
+  await sleep(300)
+
+  const panes = Array.from(win.document.querySelectorAll('.md-set-pane'))
+  const pane = idx >= 0 ? panes[idx] : null
+  const text = pane ? pane.textContent : ''
+  check('用量页渲染出来了', !!pane && text.length > 0)
+  check('用量页把两个账户分开列出', text.indexOf('DeepSeek') !== -1 && text.indexOf('小米 MiMo') !== -1, text.slice(0, 140))
+  check('有官方余额的账户显示金额', text.indexOf('12.34') !== -1, text.slice(0, 200))
+  check('没有官方来源的账户显示「余额未知」', text.indexOf('余额未知') !== -1, text.slice(0, 200))
+  check('第三方金额标注「仅供参考」', text.indexOf('仅供参考') !== -1, text.slice(0, 240))
+  check('显示总消耗', text.indexOf('总消耗（所有账户加总）') !== -1)
+  check('有单价表编辑区', text.indexOf('单价表（元/百万 token）') !== -1)
+  check('用量页没有抛异常', pageErrors.length === 0, pageErrors.join(' | '))
 }
 
 console.log('\n=== 结果：' + passed + ' 通过 / ' + failed + ' 失败 ===')
