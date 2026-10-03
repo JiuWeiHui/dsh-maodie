@@ -281,8 +281,8 @@ console.log('[0] 包文件完整性')
     }
   }
   check('package.json 是合法 JSON', pkg !== null)
-  check('name 是 maodie', pkg && pkg.name === 'maodie', String(pkg && pkg.name))
-  check('version 是 1.3.2', pkg && pkg.version === '1.3.2', String(pkg && pkg.version))
+  check('name 是 dsh-maodie', pkg && pkg.name === 'dsh-maodie', String(pkg && pkg.name))
+  check('version 是 1.3.3', pkg && pkg.version === '1.3.3', String(pkg && pkg.version))
   check('type 是 module', pkg && pkg.type === 'module')
   check('main 指向 lib/index.js', pkg && pkg.main === 'lib/index.js', String(pkg && pkg.main))
   check('声明了 dsh.bundle.patch', pkg && pkg.dsh && pkg.dsh.bundle && pkg.dsh.bundle.patch === './cordis.patch.yml')
@@ -296,7 +296,7 @@ console.log('[0] 包文件完整性')
 console.log('临时 DSH_HOME: ' + tmp)
 
 const instance = plugin.default
-check('插件导出 name 为 maodie', instance && instance.name === 'maodie', String(instance && instance.name))
+check('插件导出 name 为 maodie（运行时插件名；npm 包名是 dsh-maodie）', instance && instance.name === 'maodie', String(instance && instance.name))
 check('插件声明了 inject', Array.isArray(instance.inject), JSON.stringify(instance.inject))
 
 instance.apply(ctx)
@@ -344,7 +344,7 @@ console.log('\n[2] init.json')
   const j = res.json()
   check('HTTP 200', res.statusCode === 200, 'got ' + res.statusCode)
   check('ok=true', j && j.ok === true)
-  check('version=1.3.2', j && j.version === '1.3.2', String(j && j.version))
+  check('version=1.3.3', j && j.version === '1.3.3', String(j && j.version))
   check('带 state', j && j.state && typeof j.state === 'object')
   check('state 有 4 个默认声音槽位', j && j.state && j.state.audio && j.state.audio.slots.length === 4, String(j && j.state && j.state.audio && j.state.audio.slots.length))
   // 用户指定的默认值
@@ -455,7 +455,7 @@ console.log('\n[8] 前端脚本路由 + index 注入行')
   const rows = ctx.webServer.collectIndexInjections()
   const srcRow = rows.find((r) => r && r.kind === 'script-src')
   check('注入表里有 script-src 行', !!srcRow, JSON.stringify(rows))
-  check('注入行指向 /maodie/maodie.js 且带版本参数', !!srcRow && /^\/maodie\/maodie\.js\?v=1\.3\.2$/.test(srcRow.src), srcRow && srcRow.src)
+  check('注入行指向 /maodie/maodie.js 且带版本参数', !!srcRow && /^\/maodie\/maodie\.js\?v=1\.3\.3$/.test(srcRow.src), srcRow && srcRow.src)
   check('注入行放在 head', !!srcRow && srcRow.placement === 'head')
   check('注入表里有 preload 提示行', rows.some((r) => r && r.kind === 'script-preload' && r.src === srcRow.src))
   // 幂等：再收集一次不重复
@@ -463,8 +463,8 @@ console.log('\n[8] 前端脚本路由 + index 注入行')
   check('重复收集不会重复 push', rows2.filter((r) => r && r.kind === 'script-src').length === 1)
   // 浏览器直连路径：renderIndex 把行渲染成真正的 <script>
   const html = ctx.webServer.renderIndex('<html><head></head><body><div id="root"></div></body></html>')
-  check('renderIndex 渲染出 script 标签', html.includes('<script src="/maodie/maodie.js?v=1.3.2">'))
-  check('renderIndex 渲染出 preload', html.includes('rel="preload" as="script" href="/maodie/maodie.js?v=1.3.2"'))
+  check('renderIndex 渲染出 script 标签', html.includes('<script src="/maodie/maodie.js?v=1.3.3">'))
+  check('renderIndex 渲染出 preload', html.includes('rel="preload" as="script" href="/maodie/maodie.js?v=1.3.3"'))
 
   // 自检页：刻意不套信任栅栏，栅栏拒绝时也要能打开
   fenceMode = 'deny'
@@ -483,7 +483,7 @@ console.log('\n[8b] 前端启动回执 /maodie/hello')
   check('diag 报告 renderIndex 也渲染成功', before && before.indexInjection && before.indexInjection.renderedIntoIndexHtml === true)
 
   const post = await callRoute('/maodie/hello', 'POST', {
-    version: '1.3.2',
+    version: '1.3.3',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -584,12 +584,12 @@ console.log('\n[12] 闹钟到时（自定义文字走 { } 占位符）')
 
   // 手动跑一次闹钟巡检（真实 Host 里是 20 秒一次；这里用诊断钩子精确触发）
   const sweep = await callRoute('/maodie/diag?runAlarmSweep=1')
-  check('诊断钩子能手动跑闹钟巡检', sweep.statusCode === 200 && sweep.json().plugin === '1.3.2', String(sweep.statusCode))
+  check('诊断钩子能手动跑闹钟巡检', sweep.statusCode === 200 && sweep.json().plugin === '1.3.3', String(sweep.statusCode))
   check('巡检结果记录在 alarmChecks 里', !!sweep.json().alarmChecks && sweep.json().alarmChecks.hhmm.length === 5)
   const frame = String(sseRes.body)
   check('推送了 alarm 事件', frame.indexOf('"type":"alarm"') !== -1)
   {
-    // 1.3.2：通知文案里能用 {turnCost}/{turnTokens}，并且挂载时一次性把「本次消耗」补进已有文案
+    // 1.3.3：通知文案里能用 {turnCost}/{turnTokens}，并且挂载时一次性把「本次消耗」补进已有文案
     const st = (await callRoute('/maodie/state.json')).json()
     const tcfg = st.state && st.state.notify && st.state.notify.turnEnd
     check(
@@ -860,7 +860,7 @@ console.log('\n[17] 自定义外观图（上传 / 列表 / 删除）')
 console.log('\n[18] 前端心跳 / 报告 / diag')
 {
   const h = (await callRoute('/maodie/hello', 'POST', {
-    version: '1.3.2',
+    version: '1.3.3',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -869,7 +869,7 @@ console.log('\n[18] 前端心跳 / 报告 / diag')
   })).json()
   check('hello 回执 ok', h && h.ok === true)
   const rep = (await callRoute('/maodie/report.json', 'POST', {
-    version: '1.3.2',
+    version: '1.3.3',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -894,7 +894,7 @@ console.log('\n[18] 前端心跳 / 报告 / diag')
   })
 
   const diag = (await callRoute('/maodie/diag')).json()
-  check('diag 报插件版本', diag && diag.plugin === '1.3.2', String(diag && diag.plugin))
+  check('diag 报插件版本', diag && diag.plugin === '1.3.3', String(diag && diag.plugin))
   check('diag 报注入行', diag && diag.indexInjection && diag.indexInjection.rowsInTable >= 1)
   check('diag 报前端已启动', diag && diag.frontend && diag.frontend.booted === true)
   check(

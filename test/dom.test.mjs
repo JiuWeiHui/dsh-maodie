@@ -61,7 +61,7 @@ const initPayload = {
   webBase: 'http://127.0.0.1:19487',
   apiBase: 'http://127.0.0.1:19487/maodie',
   request: { rejection: undefined },
-  version: '1.3.2',
+  version: '1.3.3',
   state: {
     appearance: { x: null, y: null, scale: 1, baseSize: 220, opacity: 1, shadow: true, pet: true },
     look: { flipAtLeft: true, clickAnim: 'shake', tripleShake: true, particles: true, particleCount: 26, bubbleStyle: 'balloon' },
@@ -146,7 +146,7 @@ const statusPayload = {
   session: initPayload.session,
   lastTurn: null,
   turnSeq: 0,
-  // 1.3.2：账户分开 + 本轮统计（金额按 token×单价估算；第三方标「仅供参考」）
+  // 1.3.3：账户分开 + 本轮统计（金额按 token×单价估算；第三方标「仅供参考」）
   modelCtx: { provider: 'xiaomi', model: 'mimo-v2.6-pro', at: Date.now(), source: 'assistant/message' },
   turn: {
     turn: 3,
@@ -453,8 +453,8 @@ console.log('\n[7] 右键 → 设置窗口')
   check(
     '设置窗口标题显示「前端 / Host」版本',
     !!titleNode &&
-      titleNode.textContent.indexOf('前端 1.3.2') !== -1 &&
-      titleNode.textContent.indexOf('Host 1.3.2') !== -1,
+      titleNode.textContent.indexOf('前端 1.3.3') !== -1 &&
+      titleNode.textContent.indexOf('Host 1.3.3') !== -1,
     titleNode && titleNode.textContent,
   )
   const tabs = mask ? mask.querySelectorAll('.md-set-tab') : []

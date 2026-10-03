@@ -550,6 +550,14 @@ DeepSeek 内置官方参考价，不用填；第三方（小米 MiMo 等）填�
 
 > 说明：账号那条用的是**定时轮询**（60 秒）而不是 `watch()` 订阅 —— 行为一致、实现更简单；哪天需要秒级实时再换订阅。
 
+## 安装（三种方式）
+
+| 方式 | 命令 | 说明 |
+| --- | --- | --- |
+| **npm（推荐，给别人用）** | `dsh plugin add dsh-maodie` | 已发布到 npm，装完重启桌面端一次 |
+| **本地目录（开发用）** | `plugin_manager { action: "install_bundle", target: "link:<插件目录>" }` | HMR 打开时立刻生效；注入表变更仍需重启一次 |
+| **Git 直装** | `pnpm add github:JiuWeiHui/dsh-maodie` | 不想走 npm 时可用 |
+
 ## 仓库与版本
 
 这个目录本身就是一个 Git 仓库（`main` 分支，标签 `v1.2.9`）。

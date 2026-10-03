@@ -1,6 +1,6 @@
 {
-  "name": "maodie",
-  "version": "1.3.2",
+  "name": "dsh-maodie",
+  "version": "1.3.3",
   "description": "耄耋 —— DSH 桌面端常驻挂件：峰谷价与余额气泡、本次消耗、任务完成提醒、闹钟、可拖动缩放的猫、自定义外观与声音槽位、音频裁剪器",
   "keywords": [
     "dsh",
@@ -15,8 +15,19 @@
     "lib",
     "assets",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JiuWeiHui/dsh-maodie.git"
+  },
+  "homepage": "https://github.com/JiuWeiHui/dsh-maodie#readme",
+  "bugs": {
+    "url": "https://github.com/JiuWeiHui/dsh-maodie/issues"
+  },
+  "author": "JiuWeiHui",
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

@@ -20,7 +20,7 @@
   var API = '/maodie'
   // 前端脚本自己的版本：与 Host 的 /maodie/init.json.version 对不上就自动刷新页面。
   // 这样以后升级插件只要 Host 模块热重载 + 一次自动刷新，不用手动重启桌面端。
-  var MAODIE_VERSION = '1.3.2'
+  var MAODIE_VERSION = '1.3.3'
   // 页面里的异常留一份，随心跳上报给 Host（/maodie/diag 能看到）
   var pageErrors = []
   // 「用户正在操作」的判定：重建设置面板必须避开这个窗口，
