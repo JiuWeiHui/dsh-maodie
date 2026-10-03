@@ -19,3 +19,4 @@ node_modules/
 # 本机状态（插件运行时数据在 ~/.dsh/maodie/，本来就不在仓库里）
 state.json
 *.local.json
+.update-backup-*/

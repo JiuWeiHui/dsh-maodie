@@ -1221,6 +1221,12 @@ console.log('\n[25] 自定义余额来源（含试接口）+ 切换模型即时�
 
 console.log('\n[26] 检查更新 + 一键更新（预演 / 校验 / 白名单 / 真实写入）')
 {
+  // 铁律：这套用例绝不允许写进仓库目录。先把更新目标指到临时目录，
+  // 之后再按用例覆盖；下面还有一条断言专门检查仓库 README 没被动过。
+  const safeTarget = path.join(tmp, 'update-safe-target')
+  fs.mkdirSync(safeTarget, { recursive: true })
+  fs.writeFileSync(path.join(safeTarget, 'package.json'), JSON.stringify({ name: 'dsh-maodie', version: '0.0.1' }))
+  process.env.MAODIE_UPDATE_TARGET = safeTarget
   const tgz = makeTgz([
     ['package/lib/index.js', '// fake new lib'],
     ['package/assets/maodie.js', '// fake new front'],
@@ -1303,6 +1309,12 @@ console.log('\n[26] 检查更新 + 一键更新（预演 / 校验 / 白名单 / 
   const refused = (await callRoute('/maodie/update-apply.json', 'POST', {})).json()
   delete process.env.MAODIE_UPDATE_TARGET
   check('目标目录不对时拒绝更新', refused.ok === false && String(refused.error).indexOf('不像本插件') !== -1, JSON.stringify(refused.error))
+
+  // 铁律复查：整个 [26] 跑完，仓库里的 README 与 cordis.patch.yml 必须一个字节没变
+  const repoReadme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8')
+  const repoPatch = fs.readFileSync(path.join(__dirname, '..', 'cordis.patch.yml'), 'utf8')
+  check('测试没有改写仓库 README', repoReadme.indexOf('fake readme') === -1 && repoReadme.length > 1000, String(repoReadme.length))
+  check('测试没有改写仓库 cordis.patch.yml', repoPatch.indexOf('dsh-maodie') !== -1 && repoPatch.indexOf('- insert: []') === -1, repoPatch.slice(0, 60).replace(/\n/g, ' '))
 }
 
 // ---------------------------------------------------------------- 收尾
