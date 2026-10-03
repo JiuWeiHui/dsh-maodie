@@ -14,6 +14,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import zlib from 'node:zlib'
+import nodeCrypto from 'node:crypto'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -44,6 +46,34 @@ function check(name, ok, detail) {
 // 假的网络层：余额接口 + 节假日接口
 const realFetch = globalThis.fetch
 let fetchCalls = []
+// —— 造一个最小可用的 npm 包（tgz = gzip + ustar tar），给"检查更新/一键更新"测试用 ——
+function tarEntry(name, data) {
+  const header = Buffer.alloc(512)
+  header.write(name, 0, 'utf8')
+  header.write('0000644\0', 100, 'ascii')
+  header.write('0000000\0', 108, 'ascii')
+  header.write('0000000\0', 116, 'ascii')
+  header.write(data.length.toString(8).padStart(11, '0') + '\0', 124, 'ascii')
+  header.write('00000000000\0', 136, 'ascii')
+  header.write('        ', 148, 'ascii')
+  header.write('0', 156, 'ascii')
+  header.write('ustar\0', 257, 'ascii')
+  header.write('00', 263, 'ascii')
+  let sum = 0
+  for (let i = 0; i < 512; i++) sum += header[i]
+  header.write(sum.toString(8).padStart(6, '0') + '\0 ', 148, 'ascii')
+  const body = Buffer.alloc(Math.ceil(data.length / 512) * 512)
+  Buffer.from(data).copy(body)
+  return Buffer.concat([header, body])
+}
+function makeTgz(entries) {
+  const parts = entries.map(([n, d]) => tarEntry(n, d))
+  return zlib.gzipSync(Buffer.concat([...parts, Buffer.alloc(1024)]))
+}
+// 更新检查的桩：改这几个变量即可模拟不同场景
+let latestTag = 'v9.9.9'
+let assetDigest = ''
+let assetBytes = null
 globalThis.fetch = async (url, options) => {
   fetchCalls.push(String(url))
   const u = String(url)
@@ -60,6 +90,31 @@ globalThis.fetch = async (url, options) => {
         balance_infos: [{ currency: 'CNY', total_balance: '123.4567', granted_balance: '0', topped_up_balance: '123.4567' }],
       }),
     }
+  }
+  if (u.includes('api.github.com/repos/JiuWeiHui/dsh-maodie/releases/latest')) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tag_name: latestTag,
+        html_url: 'https://github.com/JiuWeiHui/dsh-maodie/releases/tag/' + latestTag,
+        body: '## 测试版\n- 新增某功能',
+        published_at: '2026-10-03T00:00:00Z',
+        assets: assetBytes
+          ? [
+              {
+                name: 'dsh-maodie-9.9.9.tgz',
+                size: assetBytes.length,
+                browser_download_url: 'https://example.test/upd.tgz',
+                digest: assetDigest,
+              },
+            ]
+          : [],
+      }),
+    }
+  }
+  if (u.includes('example.test/upd.tgz')) {
+    return { ok: true, status: 200, arrayBuffer: async () => assetBytes }
   }
   if (u.includes('example.test/notjson')) {
     return { ok: true, status: 200, text: async () => '<html>nope</html>', json: async () => ({}) }
@@ -282,7 +337,7 @@ console.log('[0] 包文件完整性')
   }
   check('package.json 是合法 JSON', pkg !== null)
   check('name 是 dsh-maodie', pkg && pkg.name === 'dsh-maodie', String(pkg && pkg.name))
-  check('version 是 1.3.3', pkg && pkg.version === '1.3.3', String(pkg && pkg.version))
+  check('version 是 1.3.4', pkg && pkg.version === '1.3.4', String(pkg && pkg.version))
   check('type 是 module', pkg && pkg.type === 'module')
   check('main 指向 lib/index.js', pkg && pkg.main === 'lib/index.js', String(pkg && pkg.main))
   check('声明了 dsh.bundle.patch', pkg && pkg.dsh && pkg.dsh.bundle && pkg.dsh.bundle.patch === './cordis.patch.yml')
@@ -329,7 +384,12 @@ check('监听了 session/event', registered.events.some((e) => e.name === 'sessi
   // 定时器改成用 Host 进程的全局 setInterval（见 README 坑 №13），
   // 所以从 diag 的 timers 字段确认登记情况，而不是从假 ctx 的 setInterval。
   const d = (await callRoute('/maodie/diag')).json()
-  check('登记了 2 个定时器（闹钟巡检 / 余额刷新）', Array.isArray(d.timers) && d.timers.length === 2, JSON.stringify(d.timers))
+  check(
+    '登记了定时器（闹钟巡检 / 余额刷新 / 更新检查）',
+    Array.isArray(d.timers) && d.timers.length >= 2 && d.timers.some((t) => t.label === 'alarm') && d.timers.some((t) => t.label === 'balance'),
+    JSON.stringify(d.timers),
+  )
+  check('更新检查定时器每 6 小时一次', Array.isArray(d.timers) && d.timers.some((t) => t.label === 'update' && t.ms === 6 * 3600 * 1000), JSON.stringify(d.timers))
   check(
     '闹钟巡检是 20 秒一次且用全局定时器注册',
     !!d.timers && d.timers.some((t) => t.label === 'alarm' && t.ms === 20000 && t.mode === 'global' && !t.error),
@@ -344,7 +404,7 @@ console.log('\n[2] init.json')
   const j = res.json()
   check('HTTP 200', res.statusCode === 200, 'got ' + res.statusCode)
   check('ok=true', j && j.ok === true)
-  check('version=1.3.3', j && j.version === '1.3.3', String(j && j.version))
+  check('version=1.3.4', j && j.version === '1.3.4', String(j && j.version))
   check('带 state', j && j.state && typeof j.state === 'object')
   check('state 有 4 个默认声音槽位', j && j.state && j.state.audio && j.state.audio.slots.length === 4, String(j && j.state && j.state.audio && j.state.audio.slots.length))
   // 用户指定的默认值
@@ -455,7 +515,7 @@ console.log('\n[8] 前端脚本路由 + index 注入行')
   const rows = ctx.webServer.collectIndexInjections()
   const srcRow = rows.find((r) => r && r.kind === 'script-src')
   check('注入表里有 script-src 行', !!srcRow, JSON.stringify(rows))
-  check('注入行指向 /maodie/maodie.js 且带版本参数', !!srcRow && /^\/maodie\/maodie\.js\?v=1\.3\.3$/.test(srcRow.src), srcRow && srcRow.src)
+  check('注入行指向 /maodie/maodie.js 且带版本参数', !!srcRow && /^\/maodie\/maodie\.js\?v=1\.3\.4$/.test(srcRow.src), srcRow && srcRow.src)
   check('注入行放在 head', !!srcRow && srcRow.placement === 'head')
   check('注入表里有 preload 提示行', rows.some((r) => r && r.kind === 'script-preload' && r.src === srcRow.src))
   // 幂等：再收集一次不重复
@@ -463,8 +523,8 @@ console.log('\n[8] 前端脚本路由 + index 注入行')
   check('重复收集不会重复 push', rows2.filter((r) => r && r.kind === 'script-src').length === 1)
   // 浏览器直连路径：renderIndex 把行渲染成真正的 <script>
   const html = ctx.webServer.renderIndex('<html><head></head><body><div id="root"></div></body></html>')
-  check('renderIndex 渲染出 script 标签', html.includes('<script src="/maodie/maodie.js?v=1.3.3">'))
-  check('renderIndex 渲染出 preload', html.includes('rel="preload" as="script" href="/maodie/maodie.js?v=1.3.3"'))
+  check('renderIndex 渲染出 script 标签', html.includes('<script src="/maodie/maodie.js?v=1.3.4">'))
+  check('renderIndex 渲染出 preload', html.includes('rel="preload" as="script" href="/maodie/maodie.js?v=1.3.4"'))
 
   // 自检页：刻意不套信任栅栏，栅栏拒绝时也要能打开
   fenceMode = 'deny'
@@ -483,7 +543,7 @@ console.log('\n[8b] 前端启动回执 /maodie/hello')
   check('diag 报告 renderIndex 也渲染成功', before && before.indexInjection && before.indexInjection.renderedIntoIndexHtml === true)
 
   const post = await callRoute('/maodie/hello', 'POST', {
-    version: '1.3.3',
+    version: '1.3.4',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -584,12 +644,12 @@ console.log('\n[12] 闹钟到时（自定义文字走 { } 占位符）')
 
   // 手动跑一次闹钟巡检（真实 Host 里是 20 秒一次；这里用诊断钩子精确触发）
   const sweep = await callRoute('/maodie/diag?runAlarmSweep=1')
-  check('诊断钩子能手动跑闹钟巡检', sweep.statusCode === 200 && sweep.json().plugin === '1.3.3', String(sweep.statusCode))
+  check('诊断钩子能手动跑闹钟巡检', sweep.statusCode === 200 && sweep.json().plugin === '1.3.4', String(sweep.statusCode))
   check('巡检结果记录在 alarmChecks 里', !!sweep.json().alarmChecks && sweep.json().alarmChecks.hhmm.length === 5)
   const frame = String(sseRes.body)
   check('推送了 alarm 事件', frame.indexOf('"type":"alarm"') !== -1)
   {
-    // 1.3.3：通知文案里能用 {turnCost}/{turnTokens}，并且挂载时一次性把「本次消耗」补进已有文案
+    // 1.3.4：通知文案里能用 {turnCost}/{turnTokens}，并且挂载时一次性把「本次消耗」补进已有文案
     const st = (await callRoute('/maodie/state.json')).json()
     const tcfg = st.state && st.state.notify && st.state.notify.turnEnd
     check(
@@ -860,7 +920,7 @@ console.log('\n[17] 自定义外观图（上传 / 列表 / 删除）')
 console.log('\n[18] 前端心跳 / 报告 / diag')
 {
   const h = (await callRoute('/maodie/hello', 'POST', {
-    version: '1.3.3',
+    version: '1.3.4',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -869,7 +929,7 @@ console.log('\n[18] 前端心跳 / 报告 / diag')
   })).json()
   check('hello 回执 ok', h && h.ok === true)
   const rep = (await callRoute('/maodie/report.json', 'POST', {
-    version: '1.3.3',
+    version: '1.3.4',
     href: 'dsh-app://app/',
     protocol: 'dsh-app:',
     apiBase: '/maodie',
@@ -894,7 +954,7 @@ console.log('\n[18] 前端心跳 / 报告 / diag')
   })
 
   const diag = (await callRoute('/maodie/diag')).json()
-  check('diag 报插件版本', diag && diag.plugin === '1.3.3', String(diag && diag.plugin))
+  check('diag 报插件版本', diag && diag.plugin === '1.3.4', String(diag && diag.plugin))
   check('diag 报注入行', diag && diag.indexInjection && diag.indexInjection.rowsInTable >= 1)
   check('diag 报前端已启动', diag && diag.frontend && diag.frontend.booted === true)
   check(
@@ -1157,6 +1217,92 @@ console.log('\n[25] 自定义余额来源（含试接口）+ 切换模型即时�
   check('状态里跟随默认模型选择（不必等下一轮对话）', !!st.modelCtx && st.modelCtx.provider === 'deepseek-official' && st.modelCtx.model === 'deepseek-v4-pro', JSON.stringify(st.modelCtx))
   check('并标明来源是默认选择', !!st.modelCtx && st.modelCtx.source === 'default-selection', String(st.modelCtx && st.modelCtx.source))
   defaultModelSelection = null
+}
+
+console.log('\n[26] 检查更新 + 一键更新（预演 / 校验 / 白名单 / 真实写入）')
+{
+  const tgz = makeTgz([
+    ['package/lib/index.js', '// fake new lib'],
+    ['package/assets/maodie.js', '// fake new front'],
+    ['package/cordis.patch.yml', '- insert: []'],
+    ['package/README.md', '# fake readme'],
+    ['package/test/mount.test.mjs', '// 不该被更新'],
+    ['package/.build/secret.mjs', '// 不该被更新'],
+    ['package/../evil.js', '// 路径穿越，必须被拒'],
+  ])
+  assetBytes = tgz
+  const goodDigest = 'sha256:' + nodeCrypto.createHash('sha256').update(tgz).digest('hex')
+  assetDigest = goodDigest
+  latestTag = 'v9.9.9'
+
+  const view0 = (await callRoute('/maodie/update.json')).json()
+  check('update.json 给出当前版本', view0.update.current === '1.3.4', JSON.stringify(view0.update).slice(0, 120))
+  check('默认自动检查开、自动安装关', view0.update.autoCheck === true && view0.update.autoInstall === false, JSON.stringify({ a: view0.update.autoCheck, b: view0.update.autoInstall }))
+
+  const chk = (await callRoute('/maodie/update-check.json')).json()
+  check('检查更新：发现新版本', chk.update.available === true && chk.update.latest === '9.9.9', JSON.stringify(chk.raw))
+  check('检查更新：带资产与说明', !!(chk.update.asset && chk.update.asset.name === 'dsh-maodie-9.9.9.tgz') && chk.update.notes.indexOf('测试版') !== -1, JSON.stringify(chk.update.asset))
+  check('检查更新：记录时间戳', typeof chk.update.checkedAt === 'number' && chk.update.checkedAt > 0)
+  check('检查更新：暴露 Release 地址', String(chk.update.url).indexOf('/releases/tag/v9.9.9') !== -1, chk.update.url)
+
+  // 预演：只报告，不动磁盘
+  const dry = (await callRoute('/maodie/update-apply.json', 'POST', { dryRun: true })).json()
+  const paths = (dry.files || []).map((f) => f.path)
+  check('预演成功并列出文件', dry.ok === true && dry.dryRun === true && paths.length >= 4, JSON.stringify(paths))
+  check('预演：白名单内的都在', ['lib/index.js', 'assets/maodie.js', 'cordis.patch.yml', 'README.md'].every((x) => paths.indexOf(x) !== -1), JSON.stringify(paths))
+  check('预演：测试与开发文件被排除', paths.indexOf('test/mount.test.mjs') === -1 && paths.every((x) => x.indexOf('.build') === -1), JSON.stringify(paths))
+  check('预演：路径穿越被拒', paths.every((x) => x.indexOf('..') === -1) && paths.every((x) => !x.startsWith('/')), JSON.stringify(paths))
+  check('预演：算出下载内容的 sha256', dry.sha256 === goodDigest.replace('sha256:', ''), String(dry.sha256))
+
+  // sha 不一致 → 中止且不改文件
+  const realIndex = fs.readFileSync(path.join(__dirname, '..', 'lib', 'index.js'), 'utf8')
+  assetDigest = 'sha256:' + 'f'.repeat(64)
+  await callRoute('/maodie/update-check.json') // 让坏 digest 生效
+  const bad = (await callRoute('/maodie/update-apply.json', 'POST', {})).json()
+  check('sha 不一致时拒绝安装', bad.ok === false && String(bad.error).indexOf('校验失败') !== -1, JSON.stringify(bad.error))
+  check('sha 不一致时没动任何文件', fs.readFileSync(path.join(__dirname, '..', 'lib', 'index.js'), 'utf8') === realIndex)
+  assetDigest = goodDigest
+
+  // 版本比较
+  latestTag = 'v' + view0.update.current
+  check('同版本不算更新', (await callRoute('/maodie/update-check.json')).json().update.available === false, latestTag)
+  latestTag = 'v0.0.1'
+  check('更低版本不算更新', (await callRoute('/maodie/update-check.json')).json().update.available === false, latestTag)
+  latestTag = 'v99.0.0'
+  check('更高版本才算更新', (await callRoute('/maodie/update-check.json')).json().update.available === true, latestTag)
+  latestTag = 'v9.9.9'
+  await callRoute('/maodie/update-check.json')
+
+  // 真实写入：改到临时目录里做（同时验证备份、白名单、排除项）
+  const tmpTarget = path.join(tmp, 'plugin-target')
+  fs.mkdirSync(path.join(tmpTarget, 'lib'), { recursive: true })
+  fs.writeFileSync(path.join(tmpTarget, 'package.json'), JSON.stringify({ name: 'dsh-maodie', version: '1.3.4' }))
+  fs.writeFileSync(path.join(tmpTarget, 'lib', 'index.js'), '// OLD lib')
+  process.env.MAODIE_UPDATE_TARGET = tmpTarget
+  const applied = (await callRoute('/maodie/update-apply.json', 'POST', {})).json()
+  delete process.env.MAODIE_UPDATE_TARGET
+  check('执行更新成功', applied.ok === true && String(applied.version) === '9.9.9', JSON.stringify({ ok: applied.ok, v: applied.version, err: applied.error }))
+  check('新内容写进去了', fs.readFileSync(path.join(tmpTarget, 'lib', 'index.js'), 'utf8').indexOf('fake new lib') !== -1)
+  check('新生效文件也写了', fs.readFileSync(path.join(tmpTarget, 'assets', 'maodie.js'), 'utf8').indexOf('fake new front') !== -1)
+  check('旧文件被备份', fs.existsSync(path.join(tmpTarget, '.update-backup-1.3.4', 'lib', 'index.js')) && fs.readFileSync(path.join(tmpTarget, '.update-backup-1.3.4', 'lib', 'index.js'), 'utf8') === '// OLD lib')
+  check('测试与开发文件没被写进去', !fs.existsSync(path.join(tmpTarget, 'test')) && !fs.existsSync(path.join(tmpTarget, '.build')))
+  check('路径穿越文件没被写出去', !fs.existsSync(path.join(tmp, 'evil.js')))
+  check('提示重启生效', String(applied.note).indexOf('重启') !== -1, applied.note)
+  check('更新状态里带上已安装版本', (await callRoute('/maodie/update.json')).json().update.latest === '9.9.9')
+
+  // 自动检查可以关
+  await callRoute('/maodie/state.json', 'POST', { state: { update: { autoCheck: false, autoInstall: false } } })
+  check('自动检查可关闭', (await callRoute('/maodie/update.json')).json().update.autoCheck === false)
+  await callRoute('/maodie/state.json', 'POST', { state: { update: { autoCheck: true, autoInstall: false } } })
+
+  // 目标目录不像本插件时拒绝写入
+  const bogus = path.join(tmp, 'bogus')
+  fs.mkdirSync(bogus, { recursive: true })
+  fs.writeFileSync(path.join(bogus, 'package.json'), JSON.stringify({ name: 'something-else' }))
+  process.env.MAODIE_UPDATE_TARGET = bogus
+  const refused = (await callRoute('/maodie/update-apply.json', 'POST', {})).json()
+  delete process.env.MAODIE_UPDATE_TARGET
+  check('目标目录不对时拒绝更新', refused.ok === false && String(refused.error).indexOf('不像本插件') !== -1, JSON.stringify(refused.error))
 }
 
 // ---------------------------------------------------------------- 收尾

@@ -61,7 +61,7 @@ const initPayload = {
   webBase: 'http://127.0.0.1:19487',
   apiBase: 'http://127.0.0.1:19487/maodie',
   request: { rejection: undefined },
-  version: '1.3.3',
+  version: '1.3.4',
   state: {
     appearance: { x: null, y: null, scale: 1, baseSize: 220, opacity: 1, shadow: true, pet: true },
     look: { flipAtLeft: true, clickAnim: 'shake', tripleShake: true, particles: true, particleCount: 26, bubbleStyle: 'balloon' },
@@ -146,7 +146,7 @@ const statusPayload = {
   session: initPayload.session,
   lastTurn: null,
   turnSeq: 0,
-  // 1.3.3：账户分开 + 本轮统计（金额按 token×单价估算；第三方标「仅供参考」）
+  // 1.3.4：账户分开 + 本轮统计（金额按 token×单价估算；第三方标「仅供参考」）
   modelCtx: { provider: 'xiaomi', model: 'mimo-v2.6-pro', at: Date.now(), source: 'assistant/message' },
   turn: {
     turn: 3,
@@ -200,6 +200,25 @@ const statusPayload = {
       linkedToProvider: false,
     },
     totals: { todayTokens: 223332, todayAmount: 1.79, currency: 'CNY', official: [{ id: 'deepseek-official', amount: 1.23 }], estimated: [{ id: 'xiaomi', amount: 0.56 }], note: '含 xiaomi ¥0.56（仅供参考）' },
+  },
+  update: {
+    current: '1.3.4',
+    latest: '9.9.9',
+    available: true,
+    checkedAt: Date.now() - 60000,
+    checking: false,
+    error: '',
+    url: 'https://github.com/JiuWeiHui/dsh-maodie/releases/tag/v9.9.9',
+    notes: '## 测试版\n- 新增某功能\n- 修了某个 bug',
+    publishedAt: '2026-10-03T00:00:00Z',
+    asset: { name: 'dsh-maodie-9.9.9.tgz', size: 12345678, digest: 'sha256:abc' },
+    installedAt: null,
+    appliedVersion: '',
+    backupDir: '',
+    autoCheck: true,
+    autoInstall: false,
+    hasGit: true,
+    target: 'C:/x/dsh-maodie',
   },
   native: initPayload.native,
   serverTime: Date.now(),
@@ -453,8 +472,8 @@ console.log('\n[7] 右键 → 设置窗口')
   check(
     '设置窗口标题显示「前端 / Host」版本',
     !!titleNode &&
-      titleNode.textContent.indexOf('前端 1.3.3') !== -1 &&
-      titleNode.textContent.indexOf('Host 1.3.3') !== -1,
+      titleNode.textContent.indexOf('前端 1.3.4') !== -1 &&
+      titleNode.textContent.indexOf('Host 1.3.4') !== -1,
     titleNode && titleNode.textContent,
   )
   const tabs = mask ? mask.querySelectorAll('.md-set-tab') : []
@@ -1034,6 +1053,40 @@ console.log('\n[17] 「用量」页：账户分开 + 单价表')
   const testBtns = pane ? Array.from(pane.querySelectorAll('button')).filter((b) => b.textContent === '测试') : []
   check('每个账户有「测试」按钮', testBtns.length >= 2, 'count=' + testBtns.length)
   check('用量页没有抛异常', pageErrors.length === 0, pageErrors.join(' | '))
+}
+
+console.log('\n[18] 「关于」页：更新面板')
+{
+  const tabs = Array.from(win.document.querySelectorAll('.md-set-tab'))
+  let idx = -1
+  tabs.forEach((t, i) => {
+    if (t.textContent === '关于') idx = i
+  })
+  check('存在「关于」标签页', idx !== -1)
+  if (idx >= 0) tabs[idx].dispatchEvent(new win.MouseEvent('click', { bubbles: true }))
+  await sleep(300)
+
+  const panes = Array.from(win.document.querySelectorAll('.md-set-pane'))
+  const pane = idx >= 0 ? panes[idx] : null
+  const text = pane ? pane.textContent : ''
+  check('关于页渲染出来了', !!pane && text.length > 0)
+  check('显示当前版本与最新版本', text.indexOf('当前版本') !== -1 && text.indexOf('1.3.4') !== -1 && text.indexOf('最新版本') !== -1 && text.indexOf('9.9.9（可更新）') !== -1, text.slice(0, 200))
+  check('显示最后检查时间（不是「还没检查过」）', text.indexOf('最后检查') !== -1 && text.indexOf('还没检查过') === -1, text.slice(0, 200))
+  check('显示更新说明摘要', text.indexOf('更新说明') !== -1 && text.indexOf('新增某功能') !== -1, text.slice(0, 400))
+  check('显示安装包与体积', text.indexOf('dsh-maodie-9.9.9.tgz') !== -1 && text.indexOf('11.8 MB') !== -1, text.slice(0, 400))
+
+  const btns = pane ? Array.from(pane.querySelectorAll('button')).map((b) => b.textContent) : []
+  check('有「检查更新」按钮', btns.indexOf('检查更新') !== -1, btns.join(','))
+  check('有「立即更新」按钮（有新版本时）', btns.indexOf('立即更新') !== -1, btns.join(','))
+  check('有「打开发布页」按钮', btns.indexOf('打开发布页') !== -1, btns.join(','))
+
+  const cbs = pane ? Array.from(pane.querySelectorAll('input[type=checkbox]')) : []
+  check('有自动检查与自动安装两个开关', cbs.length === 2, 'count=' + cbs.length)
+  check('自动检查默认勾上', cbs.length >= 1 && cbs[0].checked === true)
+  check('自动安装默认不勾', cbs.length >= 2 && cbs[1].checked === false)
+  check('开关有说明文字', text.indexOf('每 6 小时一次') !== -1 && text.indexOf('默认关') !== -1, text.slice(0, 400))
+  check('显示更新目标目录并提示 git 工作区', text.indexOf('C:/x/dsh-maodie') !== -1 && text.indexOf('git 工作区') !== -1, text.slice(0, 500))
+  check('关于页没有抛异常', pageErrors.length === 0, pageErrors.join(' | '))
 }
 
 console.log('\n=== 结果：' + passed + ' 通过 / ' + failed + ' 失败 ===')
