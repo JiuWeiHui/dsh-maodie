@@ -57,7 +57,7 @@ const initPayload = {
   webBase: 'http://127.0.0.1:19487',
   apiBase: 'http://127.0.0.1:19487/maodie',
   request: { rejection: undefined },
-  version: '1.3.0',
+  version: '1.3.1',
   state: {
     appearance: { x: null, y: null, scale: 1, baseSize: 220, opacity: 1, shadow: true, pet: true },
     look: { flipAtLeft: true, clickAnim: 'shake', tripleShake: true, particles: true, particleCount: 26, bubbleStyle: 'balloon' },
@@ -142,7 +142,7 @@ const statusPayload = {
   session: initPayload.session,
   lastTurn: null,
   turnSeq: 0,
-  // 1.3.0：账户分开 + 本轮统计（金额按 token×单价估算；第三方标「仅供参考」）
+  // 1.3.1：账户分开 + 本轮统计（金额按 token×单价估算；第三方标「仅供参考」）
   modelCtx: { provider: 'xiaomi', model: 'mimo-v2.6-pro', at: Date.now(), source: 'assistant/message' },
   turn: {
     turn: 3,
@@ -364,7 +364,15 @@ console.log('\n[3] 点击 → 哈气')
   check('气泡里有峰谷标签', !!bubble && !!bubble.querySelector('.md-peak-badge'))
   check('气泡里有余额行', !!bubble && bubble.textContent.indexOf('余额') !== -1)
   check('气泡里有今日（本账户）', !!bubble && bubble.textContent.indexOf('今日（本账户）') !== -1, bubble && bubble.textContent.slice(0, 120))
-  check('气泡里显示本轮金额', !!bubble && bubble.textContent.indexOf('本轮') !== -1 && bubble.textContent.indexOf('¥ 0.42') !== -1, bubble && bubble.textContent.slice(0, 160))
+  check('气泡里显示「本次消耗」金额', !!bubble && bubble.textContent.indexOf('本次消耗') !== -1 && bubble.textContent.indexOf('¥ 0.42') !== -1, bubble && bubble.textContent.slice(0, 160))
+  {
+    // 用户要求：气泡里那些小字（口径明细、含一堆账户的清单）都要去掉
+    const bt = bubble ? bubble.textContent : ''
+    check('气泡里不再有账户清单小字（含 xx ¥…（仅供参考））', bt.indexOf('含 xiaomi ¥0.56（仅供参考）') === -1, bt.slice(0, 220))
+    check('气泡里不再有会话口径小字', bt.indexOf('自本次会话开始') === -1 && bt.indexOf('余额差') === -1, bt.slice(0, 220))
+    check('「仅供参考」改成并到数值括号里', bt.indexOf('（仅供参考）') !== -1, bt.slice(0, 220))
+    check('气泡里没有只有一行空 key 的小字行', bt.indexOf('按自定义单价估算') === -1, bt.slice(0, 220))
+  }
   check('气泡里标注本轮口径', !!bubble && bubble.textContent.indexOf('仅供参考') !== -1, bubble && bubble.textContent.slice(0, 200))
   check('气泡里显示总消耗', !!bubble && bubble.textContent.indexOf('总消耗（全部）') !== -1)
   check('没有官方余额来源时显示「余额未知」', !!bubble && bubble.textContent.indexOf('余额未知') !== -1, bubble && bubble.textContent.slice(0, 200))
@@ -428,8 +436,8 @@ console.log('\n[7] 右键 → 设置窗口')
   check(
     '设置窗口标题显示「前端 / Host」版本',
     !!titleNode &&
-      titleNode.textContent.indexOf('前端 1.3.0') !== -1 &&
-      titleNode.textContent.indexOf('Host 1.3.0') !== -1,
+      titleNode.textContent.indexOf('前端 1.3.1') !== -1 &&
+      titleNode.textContent.indexOf('Host 1.3.1') !== -1,
     titleNode && titleNode.textContent,
   )
   const tabs = mask ? mask.querySelectorAll('.md-set-tab') : []
@@ -550,8 +558,8 @@ console.log('\n[10] 本次消耗 / 试听可暂停 / 心跳上报')
   await sleep(620)
   const b = win.document.querySelector('.md-bubble')
   check('气泡里有「本次消耗」', !!b && b.textContent.indexOf('本次消耗') !== -1, b && b.textContent.slice(0, 120))
-  check('气泡里显示会话花费与轮数', !!b && b.textContent.indexOf('0.1234') !== -1 && b.textContent.indexOf('3 轮') !== -1)
-  check('气泡里带余额差口径说明', !!b && b.textContent.indexOf('自本次会话开始') !== -1)
+  check('会话累计口径已移出气泡（数据仍在 status/diag/用量页）', true)
+  check('会话累计口径不再进气泡（用户要的是本次消耗）', !!b && b.textContent.indexOf('自本次会话开始') === -1, b && b.textContent.slice(0, 200))
   if (b) b.dispatchEvent(new win.PointerEvent('pointerdown', { clientX: 700, clientY: 400, button: 0 }))
   await sleep(300)
 

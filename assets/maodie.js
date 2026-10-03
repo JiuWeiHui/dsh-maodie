@@ -20,7 +20,7 @@
   var API = '/maodie'
   // 前端脚本自己的版本：与 Host 的 /maodie/init.json.version 对不上就自动刷新页面。
   // 这样以后升级插件只要 Host 模块热重载 + 一次自动刷新，不用手动重启桌面端。
-  var MAODIE_VERSION = '1.3.0'
+  var MAODIE_VERSION = '1.3.1'
   // 页面里的异常留一份，随心跳上报给 Host（/maodie/diag 能看到）
   var pageErrors = []
   // 「用户正在操作」的判定：重建设置面板必须避开这个窗口，
@@ -1670,15 +1670,15 @@
           }
         }
       }
+      // 气泡里只留主行，不放小字（口径明细、账户清单都去设置里的「用量」页看）；
+      // 「仅供参考」这类诚实标注并到数值后面的括号里，不额外占一行。
       if (turnInfo) {
         var r0 = el('div', 'md-bubble-row')
-        r0.appendChild(el('span', 'md-k', '本轮'))
-        r0.appendChild(el('span', 'md-v', '¥ ' + fmtMoney(turnInfo.amount) + ' · ' + fmtTokens(turnInfo.tokens || 0) + ' tokens'))
+        r0.appendChild(el('span', 'md-k', '本次消耗'))
+        var turnV = '¥ ' + fmtMoney(turnInfo.amount) + ' · ' + fmtTokens(turnInfo.tokens || 0) + ' tokens'
+        if (String(turnInfo.amountBasis || '').indexOf('仅供参考') !== -1) turnV += '（仅供参考）'
+        r0.appendChild(el('span', 'md-v', turnV))
         rows.appendChild(r0)
-        var r0b = el('div', 'md-bubble-row md-dim')
-        r0b.appendChild(el('span', 'md-k', ''))
-        r0b.appendChild(el('span', 'md-v', (turnInfo.model || turnInfo.provider || '') + ' · ' + (turnInfo.amountBasis || '')))
-        rows.appendChild(r0b)
       }
       // 今日（当前账户）+ 总消耗（所有账户）
       if (curProv && curProv.today) {
@@ -1696,14 +1696,11 @@
       if (provInfo && provInfo.totals) {
         var ra = el('div', 'md-bubble-row')
         ra.appendChild(el('span', 'md-k', '总消耗（全部）'))
-        ra.appendChild(el('span', 'md-v', '¥ ' + fmtMoney(provInfo.totals.todayAmount) + ' · ' + fmtTokens(provInfo.totals.todayTokens || 0)))
+        var allV = '¥ ' + fmtMoney(provInfo.totals.todayAmount) + ' · ' + fmtTokens(provInfo.totals.todayTokens || 0)
+        var estN = provInfo.totals.estimated ? provInfo.totals.estimated.length : 0
+        if (estN > 0) allV += '（部分仅供参考）'
+        ra.appendChild(el('span', 'md-v', allV))
         rows.appendChild(ra)
-        if (provInfo.totals.note) {
-          var rb = el('div', 'md-bubble-row md-dim')
-          rb.appendChild(el('span', 'md-k', ''))
-          rb.appendChild(el('span', 'md-v', provInfo.totals.note))
-          rows.appendChild(rb)
-        }
       }
       var r1 = el('div', 'md-bubble-row')
       r1.appendChild(el('span', 'md-k', '余额'))
@@ -1715,23 +1712,9 @@
       }
       r1.appendChild(el('span', 'md-v', balV))
       rows.appendChild(r1)
-      var r3 = el('div', 'md-bubble-row md-dim')
-      r3.appendChild(el('span', 'md-k', '≈ tokens（今日）'))
-      r3.appendChild(el('span', 'md-v', fmtTokens(data.usage.tokens) + ' · ' + (data.usage.costBasis || '')))
-      rows.appendChild(r3)
-      // 本次消耗：当前会话花了多少（余额差口径 + 真实 usage）
-      if (state.look.showSessionCost !== false) {
-        var r4 = el('div', 'md-bubble-row')
-        r4.appendChild(el('span', 'md-k', '本次消耗'))
-        r4.appendChild(el('span', 'md-v', data.session ? fmtSessionLine(data.session) : '等待会话数据'))
-        rows.appendChild(r4)
-        if (data.session && data.session.costBasis) {
-          var r5 = el('div', 'md-bubble-row md-dim')
-          r5.appendChild(el('span', 'md-k', ''))
-          r5.appendChild(el('span', 'md-v', data.session.costBasis))
-          rows.appendChild(r5)
-        }
-      }
+      // （今日 token 总量与口径不再占气泡的行，去设置里看）
+      // 会话累计口径不再进气泡（用户要的是「本次消耗」＝这一轮）：
+      // 会话数据仍在 status.json / diag / 「用量」页里，想看随时能看。
       body.appendChild(rows)
     }
 
@@ -2359,7 +2342,7 @@
     pane.appendChild(row('通知正文模板', textInput(n.body, function (v) {
       n.body = v
       persist()
-    }), '可用占位符：{today} {balance} {tokens} {peak} {currency}'))
+    }), '可用占位符：{turnCost} {turnTokens} {turnModel}（本次消耗）· {today} {balance} {tokens} {peak} {currency} · {session} {sessionTokens} {turns}（本次会话）'))
 
     var np = el('div', 'md-row-hint')
     np.textContent = '当前通知权限：' + (typeof Notification !== 'undefined' ? Notification.permission : '不支持')
